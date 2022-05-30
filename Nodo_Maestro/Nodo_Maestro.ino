@@ -1,6 +1,6 @@
 //ESP32 LoRa Gateway Code//
 //En el siguiente código, realice cambios en el SSID WiFi, la contraseña y la clave API de Thingspeak//
-
+// 
 #include <WiFi.h>
  
 //Libraries for LoRa
@@ -12,6 +12,7 @@
      U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
  
 //define the pins used by the LoRa transceiver module
+
 #define SCLK 5
 #define MISO 19
 #define MOSI 27
