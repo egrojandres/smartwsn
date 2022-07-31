@@ -1,144 +1,171 @@
-//ESP32 LoRa Sensor Node Code//
-//Antes de cargar, asegúrese de hacer los cambios en la frecuencia de LoRa según la región.//
 
-//Libraries for LoRa
-#include <SPI.h>
-#include <LoRa.h>
+#include <SPI.h>              // include libraries
+#include <LoRa.h>             //https://github.com/sandeepmistry/arduino-LoRa
+#include "SSD1306.h"          //https://github.com/ThingPulse/esp8266-oled-ssd1306
+//#include <WiFi.h>
 
-   //Libraria para la pantalla Oled
-     #include <U8g2lib.h>
-     U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
- 
-//define the pins used by the LoRa transceiver module
-#define SCLK 5
-#define MISO 19
-#define MOSI 27
-#define CS 18
-#define RST 23
-#define DIO 26
- 
-#define BAND 915E6    //433E6 for Asia, 866E6 for Europe, 915E6 for North America
- 
-//packet counter
-int readingID = 0;
- 
-int counter = 0;
-String LoRaMessage = "";
+#include <GP2YDustSensor.h>
 
+////////////////////Pinout! Customized for TTGO LoRa32 V2.0 Oled Board!//////////////////
+#define SX1278_SCLK  5    // GPIO5  -- SX1278's SCLK
+#define SX1278_MISO 19    // GPIO19 -- SX1278's MISO
+#define SX1278_MOSI 27    // GPIO27 -- SX1278's MOSI
+#define SX1278_CS   18    // GPIO18 -- SX1278's CS
+#define SX1278_RST  23    // GPIO14 -- SX1278's RESET
+#define SX1278_DI0  26    // GPIO26 -- SX1278's IRQ(Interrupt Request)
+#define OLED_SDA    21    // GPIO21  -- OLED'S SDA
+#define OLED_SCL    22    // GPIO22  -- OLED's SCL Shared with onboard LED! :(
+#define OLED_RST    16    // GPIO16  -- OLED's VCC?
+#define LORA_BAND   915E6 // LoRa Band (America)
+#define OLED_ADDR   0x3c  // OLED's ADDRESS
 
-  
-  int muestreo = 36; // Pin analógico para el pin Vo del sensor GP2Y10
-  int IRED = 25; // Pin digital para el IRED
- 
-  // Tiempos constantes para el pulso de control del IRED
-  int retardo_1 = 280;
-  int retardo_2 = 40;
-  int retardo_3 = 9680;
- 
-  // Variables auxiliares del programa
-  int valor = 0;
-  float ppm = 0;
-  float voltaje = 0;
-  float b_densidad_polvo = 0;
-  float b_ppm_real = 0;
-  int i=0;
- 
- 
- 
-//Initialize LoRa module
-void startLoRA()
-{
-  LoRa.setPins(CS, RST, DIO); //setup LoRa transceiver module
- 
-  while (!LoRa.begin(BAND) && counter < 10) {
-    Serial.print(".");
-    counter++;
-    delay(500);
-  }
-  if (counter == 10) 
-  {
-    // Increment readingID on every new reading
-    readingID++;
-    Serial.println("Starting LoRa failed!"); 
-  }
-  Serial.println("LoRa Initialization OK!");
-  delay(2000);
-}
- 
- 
-void getReadings(){
-    i=i+1; // Contador de pulsos de control
-    // El IRED se va a activar con LOW y se desactiva con HIGH según las conexiones internas del sensor
-    digitalWrite(IRED,LOW); // LED activado
-    delayMicroseconds(retardo_1); // Retardo de 0,28ms
-    valor = analogRead(muestreo); // Se muestrea el valor de Vo a través del pin analógico A0
-    ppm = ppm + valor; // Media ponderada de Vo
-    delayMicroseconds(retardo_2); // Retardo de 0,04ms
-    digitalWrite(IRED,HIGH); // LED desactivado
-    delayMicroseconds(retardo_3); // Retardo de 9,68ms
-    // retardo_1 + retardo_2 + retardo_3 = 10ms
-   
-    // Fórmulas matemáticas para el cálculo de los valores del sensor GP2Y10
-    voltaje = ppm/i*0.0049; // Voltaje en voltios (media de los valores ppm obtenidos)
-    b_densidad_polvo = (0.17*voltaje-0.1)*1000; // Densidad de partículas de polvo en ug/m3
-    b_ppm_real = (voltaje-0.0356)*120000; // Concentración de partículas de polvo en ppm
-    if (b_ppm_real < 0)
-      b_ppm_real = 0;
-    if (b_densidad_polvo < 0 )
-      b_densidad_polvo = 0;
-    if (b_densidad_polvo > 500)
-      b_densidad_polvo = 500;
-   
-    // Presentamos el voltaje a través del MONITOR SERIE
+// Defineded Pines for SharpGP2Y10B //
+
+const uint8_t SHARP_LED_PIN = 25;   // Sharp Dust/particle sensor Led Pin
+const uint8_t SHARP_VO_PIN = 36;    // Sharp Dust/particle analog out pin used for reading 
+
+GP2YDustSensor dustSensor(GP2YDustSensorType::GP2Y1010AU0F, SHARP_LED_PIN, SHARP_VO_PIN);
+SSD1306 display(OLED_ADDR, OLED_SDA, OLED_SCL);    // INICIALIZACION DE PANTALLA
+
+//////////////////////// CONFIG PLACA A //////////////
+byte localAddress = 18;                            // address of this device
+byte destination = 8;                              // destination to send to
+int interval = 3000;                               // interval between sends
+String message;                                    // send a message
+String outgoing;                                   // outgoing message
+byte msgCount = 0;                                 // count of outgoing messages
+long lastSendTime = 0;                             // last send time
+int contador = 0;                                  //
+String IdNode = "A";                               //
+float calibrate = 400;                            // Adjusted to ppm of Co2, clean air has 400ppm of Co2
+/////////////////////////////////////////////////////
+
+String CO2_level;
+String AirQuality;
+
+  void sendMessage(String outgoing) {
     
-    Serial.print("-> VOLTAJE A: ");
-    Serial.print(voltaje); // Tres decimales
-    Serial.print(" V");
-   
-    // Presentamos la densidad de partículas de polvo a través del MONITOR SERIE
-    
-    Serial.print("  -> DENSIDAD A: ");    
-    Serial.print(b_densidad_polvo); // Tres decimales
-    Serial.print(" ug/m3");
-   
-    // Presentamos la concentración de partículas de polvo a través del MONITOR SERIE
+  LoRa.beginPacket();                   // start packet
+  LoRa.write(destination);              // add destination address
+  LoRa.write(localAddress);             // add sender address
+  LoRa.write(msgCount);                 // add message ID
+  LoRa.write(outgoing.length());        // add payload length
+  LoRa.print(outgoing);                 // add payload
+  LoRa.endPacket();                     // finish packet and send it
+  printScreen();
+  Serial.println("Sending message " + String(msgCount) + " to address: "+ String(destination));
+  Serial.println(outgoing); 
+  Serial.println();
+  msgCount++;                           // increment message ID
+}
 
-   Serial.print("  -> CONCENTRACION A: ");
-   Serial.print(b_ppm_real); // Tres decimales
-   Serial.println(" ppm");   
-}
- 
-void sendReadings() {
-  LoRaMessage = String(readingID) + "/" + String(b_densidad_polvo) + "&" + String(b_ppm_real) ;
-  //Send LoRa packet to receiver
-  LoRa.beginPacket();
-  LoRa.print(LoRaMessage);
-  LoRa.endPacket();
+void getReadingsDustDensity(){
+
+  int   Reading = analogRead(36); 
+  float Dustdensity = (dustSensor.getDustDensity());
+  float Ppm = (dustSensor.getRunningAverage()*1000);
   
-  Serial.print("Sending packet: ");
-  Serial.println(readingID);
-  readingID++;
-  Serial.println(LoRaMessage);
+
+  if (Ppm <= 75000)                          AirQuality = "Excelent";   // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
+  else if (Ppm > 75001 && Ppm < 150000)      AirQuality = "Very Good";
+  else if (Ppm > 150001 && Ppm < 300000)     AirQuality = "Good";
+  else if (Ppm > 300001 && Ppm < 1050000)    AirQuality = "Acceptable";
+  else if (Ppm > 1050001 && Ppm < 3000000)   AirQuality = "Poor";
+  else if (Ppm > 3000001)                    AirQuality = "_Very Poor";
+  else                                       AirQuality = "None";
+
+  Serial.println("DustDensity Measurement:");
+  Serial.println(String(Reading) + " " + String(Ppm) + "ug/m3 " + "Quality Air: "+AirQuality);
+  String AQ = AirQuality.substring(0,1); // it's not work
+  message = IdNode+AQ+"&"+Ppm;
+  sendMessage(message);
+  delay(1000);   
 }
- 
+
+void getReadingGas (){
+
+  int   Reading = analogRead(39);                 // Raw ADC reading ESP32 on VP or analogRead(39); on VN or analogRead(35); on GPIO 35, you choose!
+  float sensorVoltage = Reading/1024.0 * 5.00;    // Calibrated to measured sensor voltage using resitive divider
+                                                  // It's Important this comment for your proyect.
+  float ppm = sensorVoltage * calibrate;             // Adjusted to ppm of Co2, clean air has 400ppm of Co2, sensor output = 0.16v in clean air (0.16x2500=400)
+  
+  if      (ppm > 6000) CO2_level = "Extreme";      
+  else if (ppm > 3000) CO2_level = "High";
+  else if (ppm > 1500) CO2_level = "Moderate";
+  else if (ppm > 500)  CO2_level = "Low";
+  else                 CO2_level = "None";
+
+  Serial.println("CO2 Level");
+  Serial.println(String(Reading) + " " + String(sensorVoltage) + "v " + String(ppm) + " Co2 Level: "+CO2_level);
+  String GS = CO2_level.substring(0,1); 
+  message = IdNode+GS+"/"+ppm;
+  sendMessage(message);   
+  delay(1000);
+}
+
+void printScreen() {
+        
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_10);
+  display.setColor(BLACK);
+  display.fillRect(0, 0, 127, 30);
+  display.display();
+
+  display.setColor(WHITE);
+  display.drawString(0, 00, "LoRaWSN: " + String(localAddress));
+  display.drawString(0, 10, " Node: " + IdNode
+                          + " To: " + String(destination)
+                          + " Air is: " + AirQuality);
+  display.drawString(0, 20, " CO2 Level: " + CO2_level);
+  display.display();
+} 
+
+
 void setup() {
-  //initialize Serial Monitor
-      pinMode(IRED,OUTPUT); // Pin digital 25 como salida
-      Serial.begin(115200);
-      Serial.println(F("DETECTOR  DE PARTICULAS POLVO"));
-      startLoRA();
-       u8g2.begin();                                //Se Inicializa la pantalla OLED
+  
+  Serial.begin(115200);
+  pinMode(OLED_RST,OUTPUT);
+  digitalWrite(OLED_RST, LOW);                                    // set GPIO16 low to reset OLED
+  delay(50);
+  digitalWrite(OLED_RST, HIGH);                                   // while OLED running, must set GPIO16 in high
+  delay(1000);
+  display.init();
+  display.flipScreenVertically();
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_10);
+  display.clear();
+  while (!Serial);
+  Serial.println("TTGO LoRa32 V2.0 P2P");
+  display.drawString(0, 00, "TTGO LoRa32 V2.0 P2P");
+  display.display();
+  LoRa.setPins(SX1278_CS, SX1278_RST, SX1278_DI0);// set CS, reset, IRQ pin
+  if (!LoRa.begin(LORA_BAND))
+  {             // initialize ratio at 868 MHz
+    Serial.println("LoRa init failed. Check your connections.");
+    display.drawString(0, 10, "LoRa init failed");
+    display.drawString(0, 20, "Check connections");
+    display.display();
+    while (true);                       // if failed, do nothing
+  }
+  Serial.println("LoRa init succeeded.");
+  display.drawString(0, 10, "LoRa init succeeded.");
+  display.display();
+  delay(1500);
+  display.clear();
+  display.display();
+  dustSensor.begin();
 }
-void loop() {
-     
-     u8g2.clearBuffer();                          //Limpiar la memoria interna
-     u8g2.setFont(u8g2_font_pxplusibmvga9_tr);    //Elija una fuente adecuada en https://github.com/olikraus/u8g2/wiki/fntlistall
-     u8g2.drawStr(0,15,"Dust Density B: ");          //Escribe algo en la memoria interna
-     u8g2.setCursor(0, 31);
-     u8g2.print(b_densidad_polvo); 
-     u8g2.sendBuffer();                           //Transferir la memoria interna a la pantalla
- 
-     getReadings();
-     sendReadings();
 
+void loop() {
+  if (millis() - lastSendTime > interval) {
+    getReadingsDustDensity();
+      if (millis() > 20000){            // time for warm the MQ135 
+      getReadingGas();
+      }else{
+        Serial.println("Wait 2-mins while sensor to warm-up!");
+        display.drawString(0, 20, "MQ135 is warming up");
+      }
+    lastSendTime = millis();            // timestamp the message
+    interval = random(2000) + 1000;     // 2-3 seconds
+    }
 }

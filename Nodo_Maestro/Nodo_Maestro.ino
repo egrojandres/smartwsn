@@ -1,190 +1,259 @@
-//ESP32 LoRa Gateway Code//
-//En el siguiente código, realice cambios en el SSID WiFi, la contraseña y la clave API de Thingspeak//
-// 
+#include <SPI.h>              // include libraries
+#include <LoRa.h>             //https://github.com/sandeepmistry/arduino-LoRa
+#include "SSD1306.h"          //https://github.com/ThingPulse/esp8266-oled-ssd1306
 #include <WiFi.h>
- 
-//Libraries for LoRa
-#include <SPI.h>
-#include <LoRa.h>
 
-   //Libraria para la pantalla Oled
-     #include <U8g2lib.h>
-     U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
- 
-//define the pins used by the LoRa transceiver module
+////////////////////Pinout! Customized for TTGO LoRa32 V2.0 Oled Board!//////////////////
+#define SX1278_SCLK  5    // GPIO5  -- SX1278's SCLK
+#define SX1278_MISO 19    // GPIO19 -- SX1278's MISO
+#define SX1278_MOSI 27    // GPIO27 -- SX1278's MOSI
+#define SX1278_CS   18    // GPIO18 -- SX1278's CS
+#define SX1278_RST  23    // GPIO14 -- SX1278's RESET
+#define SX1278_DI0  26    // GPIO26 -- SX1278's IRQ(Interrupt Request)
+#define OLED_SDA    21    // GPIO21  -- OLED'S SDA
+#define OLED_SCL    22    // GPIO22  -- OLED's SCL Shared with onboard LED! :(
+#define OLED_RST    16    // GPIO16  -- OLED's VCC?
+#define LORA_BAND   915E6 // LoRa Band (America)
+#define OLED_ADDR   0x3c  // OLED's ADDRESS
 
-#define SCLK 5
-#define MISO 19
-#define MOSI 27
-#define CS 18
-#define RST 23
-#define DIO 26
- 
-#define BAND 915E6    //433E6 for Asia, 866E6 for Europe, 915E6 for North America
- 
- 
-// Replace with your network credentials
-String apiKey = "ZIAIA0FNJK6MGOM0"; // Enter your Write API key from ThingSpeak
-const char *ssid = "DmGv_2.4GHz"; // replace with your wifi ssid and wpa2 key
-const char *password = "1$h1k1.22";
-const char* server = "api.thingspeak.com";
- 
-WiFiClient client;
- 
- 
-// Initialize variables to get and save LoRa data
+SSD1306 display(OLED_ADDR, OLED_SDA, OLED_SCL);    // INICIALIZACION DE PANTALLA
+
+//////////////////////// CONFIG PLACA A //////////////
+byte localAddress = 8;                            // address of this device
+byte destination = 18;                              // destination to send to
+int interval = 3000;                               // interval between sends
+String message = "";                               // send a message
+String outgoing;                                   // outgoing message
+byte msgCount = 0;                                 // count of outgoing messages
+long lastSendTime = 0;                             // last send time
+int contador = 0;                                  //
+String IdPlaca = "A";                              //
+/////////////////////////////////////////////////////
+
+/////////////////////// CREDENCIALES DE RED ///////////////////////////////
+
 int rssi;
-String loRaMessage;
-String b_densidad_polvo;
-String b_ppm_real;
-String readingID;
+String apiKey = "ZIAIA0FNJK6MGOM0";             // Enter your Write API key from ThingSpeak
+const char *ssid = "MANUEL";                    // replace with your wifi ssid and wpa2 key
+const char *password = "Negro1967";             // PASSWORD WiFi
+const char* server = "api.thingspeak.com"; 
+WiFiClient client; 
 
 
-  int muestreo = 36; // Pin analógico para el pin Vo del sensor GP2Y10
-  int IRED = 25; // Pin digital para el IRED
- 
-  // Tiempos constantes para el pulso de control del IRED
-  int retardo_1 = 280;
-  int retardo_2 = 40;
-  int retardo_3 = 9680;
- 
-  // Variables auxiliares del programa
-  int valor = 0;
-  float ppm = 0;
-  float voltaje = 0;
-  float a_densidad_polvo = 0;
-  float a_ppm_real = 0;
-  int i=0;
- 
-// Replaces placeholder with DHT values
-String processor(const String& var){
-  //Serial.println(var);
-  if(var == "DENSIDAD")
-  {
-    return b_densidad_polvo;
-  }
-  else if(var == "CONCENTRACION")
-  {
-    return b_ppm_real;
-  }
-  else if (var == "RRSI")
-  {
-    return String(rssi);
-  }
-  return String();
-  }
+// Variables del código
+
+String Dustdensity = "";
+String Ppm = "";
+String GasMeasurement = "";
+String AdustDensity = "";
+String AgasMeasurement = "";
+String BdustDensity = "";
+String BgasMeasurement = "";
+String CdustDensity = "";
+String CgasMeasurement = "";
 
 
+void connectWiFi(){
+//Conéctese a la red Wi-Fi con SSID y contraseña
+      Serial.print("Connecting to ");
+      Serial.println(ssid);
+      WiFi.begin(ssid, password);
+      while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+      }
+    //Imprime la dirección IP local e inicia el servidor web
+      Serial.println("");
+      Serial.println("WiFi connected.");
+      Serial.println("IP address: ");
+      Serial.println(WiFi.localIP());
+  
+      }
 
-  void getReadings(){
-    i=i+1; // Contador de pulsos de control
-    // El IRED se va a activar con LOW y se desactiva con HIGH según las conexiones internas del sensor
-    digitalWrite(IRED,LOW); // LED activado
-    delayMicroseconds(retardo_1); // Retardo de 0,28ms
-    valor = analogRead(muestreo); // Se muestrea el valor de Vo a través del pin analógico A0
-    ppm = ppm + valor; // Media ponderada de Vo
-    delayMicroseconds(retardo_2); // Retardo de 0,04ms
-    digitalWrite(IRED,HIGH); // LED desactivado
-    delayMicroseconds(retardo_3); // Retardo de 9,68ms
-    // retardo_1 + retardo_2 + retardo_3 = 10ms
-   
-    // Fórmulas matemáticas para el cálculo de los valores del sensor GP2Y10
-    voltaje = ppm/i*0.0049; // Voltaje en voltios (media de los valores ppm obtenidos)
-    a_densidad_polvo = (0.17*voltaje-0.1)*1000; // Densidad de partículas de polvo en ug/m3
-    a_ppm_real = (voltaje-0.0356)*120000; // Concentración de partículas de polvo en ppm
-    if (a_ppm_real < 0)
-      a_ppm_real = 0;
-    if (a_densidad_polvo < 0 )
-      a_densidad_polvo = 0;
-    if (a_densidad_polvo > 500)
-      a_densidad_polvo = 500;
-   
-    // Presentamos el voltaje a través del MONITOR SERIE
-    
-    }
-
-   void setup() {
-  Serial.begin(115200);
-  int counter;
- 
-  //setup LoRa transceiver module
-  LoRa.setPins(CS, RST, DIO); //setup LoRa transceiver module
- 
-  while (!LoRa.begin(BAND) && counter < 10) {
-    Serial.print(".");
-    counter++;
-    delay(2000);
-  }
-  if (counter == 10) {
-    // Increment readingID on every new reading
-    Serial.println("Starting LoRa failed!"); 
-  }
-  Serial.println("LoRa Initialization OK!");
-  delay(2000);
- 
-  // Connect to Wi-Fi network with SSID and password
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(2000);
-    Serial.print(".");
-  }
-  // Print local IP address and start web server
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-
-    pinMode(IRED,OUTPUT); // Pin digital 25 como salida
-    Serial.println(F("DETECTOR  DE PARTICULAS POLVO"));
-    u8g2.begin(); 
+void printScreen() {
+  
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_10);
+  display.setColor(BLACK);
+  display.fillRect(0, 0, 127, 30);
+  display.display();
+  display.setColor(WHITE);
+  display.drawString(0, 00, "LoRaWSN: " + String(localAddress));
+  display.drawString(0, 10, "Node: Maester");                  
+  display.drawString(0, 20, " N: " + String(msgCount));
+  display.display();
+  
 }
- 
- 
-  // Read LoRa packet and get the sensor readings
-  void loop() 
-   {
-  
-   getReadings();
 
-   int packetSize = LoRa.parsePacket();
-   if (packetSize)
-   {
-    Serial.print("Lora packet received: ");
-    while (LoRa.available())    // Read packet
-   {
-    String LoRaData = LoRa.readString();
-    Serial.print(LoRaData); 
-    
-    
-    int pos1 = LoRaData.indexOf('/');   
-    int pos2 = LoRaData.indexOf('&');   
-    readingID = LoRaData.substring(0, pos1);                        // Pedir readingID
-    b_densidad_polvo = LoRaData.substring(pos1 +1, pos2);           // Pedir DENSIDAD
-    b_ppm_real = LoRaData.substring(pos2+1, LoRaData.length());     // Pedir CONCENTRACION
-   }
+// Revisar función, debe separar el valor de dusttdendity y valor de gas por aparte.
+
+void assignValues (String incommingText){
+
+  int pos1;
   
-  rssi = LoRa.packetRssi();       // Get RSSI
-  Serial.print(" with RSSI ");    
-  Serial.println(rssi);
-   }
- 
+  if (incommingText.indexOf('&')) {
+  pos1 = incommingText.indexOf('&');
+  Dustdensity = incommingText.substring(pos1,incommingText.length());
   
-   if (client.connect(server, 80)) // "184.106.153.149" or api.thingspeak.com
-   {
+  if      (incommingText.charAt(0) == 'A') AdustDensity = Dustdensity;
+  else if (incommingText.charAt(0) == 'B') BdustDensity = Dustdensity;
+  else if (incommingText.charAt(0) == 'C') CdustDensity = Dustdensity;
+  
+  
+  }else if (incommingText.indexOf('/')) {
+  pos1 = incommingText.indexOf('/');
+  GasMeasurement = incommingText.substring(pos1,incommingText.length());
+
+  if      (incommingText.charAt(0) == 'A') AgasMeasurement = GasMeasurement;
+  else if (incommingText.charAt(0) == 'B') BgasMeasurement = GasMeasurement;
+  else if (incommingText.charAt(0) == 'C') CgasMeasurement = GasMeasurement;
+  
+  }else Serial.println("data reading error"); 
+
+}
+
+
+void onReceive(int packetSize) {
+  
+  if (packetSize == 0) {
+  Serial.println("error");  
+  return;          // if there's no packet, return
+  }
+  printScreen();
+  // read packet header bytes:
+  int recipient = LoRa.read();          // recipient address
+  byte sender = LoRa.read();            // sender address
+  byte incomingMsgId = LoRa.read();     // incoming msg ID
+  byte incomingLength = LoRa.read();    // incoming msg length
+  String incoming = "";                 // payload of packet
+  String variable = "";
+
+
+  while (LoRa.available()) {            // can't use readString() in callback, so
+    incoming += (char)LoRa.read();      // add bytes one by one
+  }
+
+  if (incomingLength != incoming.length()) {   // check length for error
+    Serial.println("error: message length does not match length");
+    incoming = "message length error";
+    return;                             // skip rest of function
+  }
+
+  // if the recipient isn't this device or broadcast,
+  if (recipient != localAddress && recipient != 0xFF) {
+    Serial.println("This message is not for me.");
+    incoming = "message is not for me";
+    return;                             // skip rest of function
+  }
+
+  assignValues (incoming);
+
+  display.setColor(BLACK);
+  display.fillRect(0, 32, 127, 61);
+  display.display();
+
+  display.setColor(WHITE);
+  display.drawLine(0,31,127,31);
+  display.drawString(0, 32, "Rx PKT: " + incoming);
+  display.drawString(0, 42, "RSSI: " + String(LoRa.packetRssi())
+                          + " SNR: " + String(LoRa.packetSnr()));
+  display.drawString(0, 52, "FR:"  + String(sender)
+                          + " LN:" + String(incomingLength)
+                          + " ID:" + String(incomingMsgId));
+  display.display();
+
+  // if message is for this device, or broadcast, print details:
+  Serial.println("Received from: 0x" + String(sender, HEX));
+  Serial.println("Sent to: 0x" + String(recipient, HEX));
+  Serial.println("Message ID: " + String(incomingMsgId));
+  Serial.println("Message length: " + String(incomingLength));
+  Serial.println("Message: " + incoming);
+  Serial.println("RSSI: " + String(LoRa.packetRssi()));
+  Serial.println("Snr: " + String(LoRa.packetSnr()));
+  Serial.println();
+  delay(1000);
+}
+
+void setup() {
+  
+Serial.begin(115200);
+  
+  pinMode(OLED_RST,OUTPUT);
+  digitalWrite(OLED_RST, LOW);                    // set GPIO16 low to reset OLED
+  delay(50);
+  digitalWrite(OLED_RST, HIGH);                   // while OLED running, must set GPIO16 in high
+  delay(1000);
+
+  display.init();
+  display.flipScreenVertically();
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_10);
+  display.clear();
+
+  while (!Serial);
+  Serial.println("TTGO LoRa32 V2.0 P2P");
+  display.drawString(0, 00, "TTGO LoRa32 V2.0 P2P");
+  display.display();
+  LoRa.setPins(SX1278_CS, SX1278_RST, SX1278_DI0); // set CS, reset, IRQ pin
+
+  if (!LoRa.begin(LORA_BAND)) {                    // initialize ratio at 915 MHz
+    Serial.println("LoRa init failed. Check your connections.");
+    display.drawString(0, 10, "LoRa init failed");
+    display.drawString(0, 20, "Check connections");
+    display.display();
+    while (true);                                 // if failed, do nothing
+  }
+
+  //LoRa.onReceive(onReceive);
+  LoRa.receive();
+  Serial.println("LoRa init succeeded.");
+  display.drawString(0, 10, "LoRa init succeeded.");
+  display.display();
+  delay(1500);
+  display.clear();
+  display.display();
+
+  //Connect to Wifi Network with SSID and Password
+      Serial.print("Connecting to ");
+      Serial.println(ssid);
+      WiFi.begin(ssid, password);
+      while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+      }
+    //Print the local IP address and start the web server
+      Serial.println("");
+      Serial.println("WiFi connected.");
+      Serial.println("IP address: ");
+      Serial.println(WiFi.localIP());
+
+}
+
+void loop() {
+  if (millis() - lastSendTime > interval) {
+    lastSendTime = millis();            // timestamp the message
+    interval = random(2000) + 1000;     // 2-3 seconds
+    LoRa.receive();                     // go back into receive mode
+  }
+  int packetSize = LoRa.parsePacket();
+  if (packetSize) { onReceive(packetSize);  
+  }
+  if (client.connect(server, 80)){ // "184.106.153.149" or api.thingspeak.com
       String postStr = apiKey;
       postStr += "&field1=";
-      postStr += String(a_densidad_polvo);
+      postStr += AdustDensity;
       postStr += "&field2=";
-      postStr += String(a_ppm_real);
+      postStr += AgasMeasurement;
       postStr += "&field3=";
-      postStr += String(b_densidad_polvo);
+      postStr += BdustDensity;
       postStr += "&field4=";
-      postStr += String(b_ppm_real);
+      postStr += BgasMeasurement;
       postStr += "&field5=";
-      postStr += String(rssi);
-      
+      postStr += CdustDensity;
+      postStr += "&field6=";
+      postStr += CgasMeasurement;
+      postStr += "&field7=";
+      postStr += CgasMeasurement;
       postStr += "\r\n\r\n\r\n\r\n";
     
       client.print("POST /update HTTP/1.1\n");
@@ -197,36 +266,6 @@ String processor(const String& var){
       client.print("\n\n");
       client.print(postStr);
  
-    }
-
-    // Presentamos el voltaje a través del MONITOR SERIE
-    
-    Serial.print("-> VOLTAJE A: ");
-    Serial.print(voltaje); // Tres decimales
-    Serial.print(" V");
-   
-    // Presentamos la densidad de partículas de polvo a través del MONITOR SERIE
-    
-    Serial.print("  -> DENSIDAD A: ");    
-    Serial.print(a_densidad_polvo); // Tres decimales
-    Serial.print(" ug/m3");
-   
-    // Presentamos la concentración de partículas de polvo a través del MONITOR SERIE
-
-   Serial.print("  -> CONCENTRACION A: ");
-   Serial.print(a_ppm_real); // Tres decimales
-   Serial.println(" ppm");
-
-
-
-     u8g2.clearBuffer();                          //Limpiar la memoria interna
-     u8g2.setFont(u8g2_font_pxplusibmvga9_tr);    //Elija una fuente adecuada en https://github.com/olikraus/u8g2/wiki/fntlistall
-     u8g2.drawStr(0,15,"Dust Density A: ");          //Escribe algo en la memoria interna
-     u8g2.setCursor(0, 31);
-     u8g2.print(a_densidad_polvo); 
-     u8g2.sendBuffer();                           //Transferir la memoria interna a la pantalla
-
-    
-    //delay(30000);
-    }
-   
+      }    
+      delay(5000); //The data is uploaded to ThinkSpeak after an interval of 5s.
+      }
