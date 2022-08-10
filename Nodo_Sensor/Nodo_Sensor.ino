@@ -61,22 +61,22 @@ String AirQuality;
 
 void getReadingsDustDensity(){
 
-  int   Reading = analogRead(36); 
+  int   Reading = analogRead(13); 
   float Dustdensity = (dustSensor.getDustDensity());
-  float Ppm = (dustSensor.getRunningAverage()*1000);
+  float Ppm = (dustSensor.getRunningAverage());
   
 
-  if (Ppm <= 75000)                          AirQuality = "Excelent";   // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
-  else if (Ppm > 75001 && Ppm < 150000)      AirQuality = "Very Good";
-  else if (Ppm > 150001 && Ppm < 300000)     AirQuality = "Good";
-  else if (Ppm > 300001 && Ppm < 1050000)    AirQuality = "Acceptable";
-  else if (Ppm > 1050001 && Ppm < 3000000)   AirQuality = "Poor";
-  else if (Ppm > 3000001)                    AirQuality = "_Very Poor";
+  if (Ppm <= 750)                          AirQuality = "Excelent";   // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
+  else if (Ppm > 751 && Ppm < 1500)      AirQuality = "Very Good";
+  else if (Ppm > 1501 && Ppm < 3000)     AirQuality = "Good";
+  else if (Ppm > 3001 && Ppm < 10500)    AirQuality = "Acceptable";
+  else if (Ppm > 10501 && Ppm < 30000)   AirQuality = "Poor";
+  else if (Ppm > 30001)                    AirQuality = "_Very Poor";
   else                                       AirQuality = "None";
 
   Serial.println("DustDensity Measurement:");
   Serial.println(String(Reading) + " " + String(Ppm) + "ug/m3 " + "Quality Air: "+AirQuality);
-  String AQ = AirQuality.substring(0,1); // it's not work
+  String AQ = AirQuality.substring(0,1); 
   message = IdNode+AQ+"&"+Ppm;
   sendMessage(message);
   delay(1000);   
@@ -87,7 +87,7 @@ void getReadingGas (){
   int   Reading = analogRead(39);                 // Raw ADC reading ESP32 on VP or analogRead(39); on VN or analogRead(35); on GPIO 35, you choose!
   float sensorVoltage = Reading/1024.0 * 5.00;    // Calibrated to measured sensor voltage using resitive divider
                                                   // It's Important this comment for your proyect.
-  float ppm = sensorVoltage * calibrate;             // Adjusted to ppm of Co2, clean air has 400ppm of Co2, sensor output = 0.16v in clean air (0.16x2500=400)
+  float ppm = sensorVoltage * calibrate;          // Adjusted to ppm of Co2, clean air has 400ppm of Co2, sensor output = 0.16v in clean air (0.16x2500=400)
   
   if      (ppm > 6000) CO2_level = "Extreme";      
   else if (ppm > 3000) CO2_level = "High";

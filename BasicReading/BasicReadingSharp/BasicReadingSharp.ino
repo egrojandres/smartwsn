@@ -1,12 +1,13 @@
+#include <SPI.h>              // include libraries
 #include <GP2YDustSensor.h>
 
-const uint8_t SHARP_LED_PIN = 26;   // Sharp Dust/particle sensor Led Pin
-const uint8_t SHARP_VO_PIN = 36;    // Sharp Dust/particle analog out pin used for reading 
+const uint8_t SHARP_LED_PIN = 25;   // Sharp Dust/particle sensor Led Pin
+const uint8_t SHARP_VO_PIN = 13;    // Sharp Dust/particle analog out pin used for reading 
 
 GP2YDustSensor dustSensor(GP2YDustSensorType::GP2Y1010AU0F, SHARP_LED_PIN, SHARP_VO_PIN);
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   //dustSensor.setBaseline(0.4); // set no dust voltage according to your own experiments
   //dustSensor.setCalibrationFactor(1.1); // calibrate against precision instrument
   dustSensor.begin();
