@@ -28,8 +28,8 @@ GP2YDustSensor dustSensor(GP2YDustSensorType::GP2Y1010AU0F, SHARP_LED_PIN, SHARP
 SSD1306 display(OLED_ADDR, OLED_SDA, OLED_SCL);    // INICIALIZACION DE PANTALLA
 
 //////////////////////// CONFIG PLACA A //////////////
-byte localAddress = 18;                            // address of this device
-byte destination = 8;                              // destination to send to
+byte localAddress = 0xFF;                            // address of this device
+byte destination = 0XAB;                              // destination to send to
 int interval = 3000;                               // interval between sends
 String message;                                    // send a message
 String outgoing;                                   // outgoing message
@@ -52,55 +52,61 @@ String AirQuality;
   LoRa.write(outgoing.length());        // add payload length
   LoRa.print(outgoing);                 // add payload
   LoRa.endPacket();                     // finish packet and send it
+  msgCount++;                           // increment message ID
   printScreen();
-  Serial.println("Sending message " + String(msgCount) + " to address: "+ String(destination));
+  Serial.println("Sending message to :"+(destination));
   Serial.println(outgoing); 
   Serial.println();
   msgCount++;                           // increment message ID
+  delay (2000);
 }
 
-void getReadingsDustDensity(){
 
-  int   Reading = analogRead(13); 
+String getReadingsDustDensity(){
+
+  int   Reading = analogRead(36); 
   float Dustdensity = (dustSensor.getDustDensity());
   float Ppm = (dustSensor.getRunningAverage());
   
 
-  if (Ppm <= 750)                          AirQuality = "Excelent";   // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
-  else if (Ppm > 751 && Ppm < 1500)      AirQuality = "Very Good";
-  else if (Ppm > 1501 && Ppm < 3000)     AirQuality = "Good";
-  else if (Ppm > 3001 && Ppm < 10500)    AirQuality = "Acceptable";
-  else if (Ppm > 10501 && Ppm < 30000)   AirQuality = "Poor";
-  else if (Ppm > 30001)                    AirQuality = "_Very Poor";
-  else                                       AirQuality = "None";
+  if (Dustdensity <= 75)                               AirQuality = "Excelent";   // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
+  else if (Dustdensity > 76 && Dustdensity < 150)      AirQuality = "Very Good";
+  else if (Dustdensity > 151 && Dustdensity < 300)     AirQuality = "Good";
+  else if (Dustdensity > 301 && Dustdensity < 1500)    AirQuality = "Acceptable";
+  else if (Dustdensity > 1501 && Dustdensity < 2998)   AirQuality = "Poor";
+  else if (Dustdensity >= 2999)                        AirQuality = "_Very Poor";
+  else                                                 AirQuality = "None";
 
   Serial.println("DustDensity Measurement:");
   Serial.println(String(Reading) + " " + String(Ppm) + "ug/m3 " + "Quality Air: "+AirQuality);
+  
   String AQ = AirQuality.substring(0,1); 
-  message = IdNode+AQ+"&"+Ppm;
-  sendMessage(message);
-  delay(1000);   
+  message = IdNode+AQ+"&"+String(Ppm,2)+"$"+String(Dustdensity,2);                //Convert Float values to one String
+  return message;
+    
 }
 
-void getReadingGas (){
+String getReadingGas (){
 
-  int   Reading = analogRead(39);                 // Raw ADC reading ESP32 on VP or analogRead(39); on VN or analogRead(35); on GPIO 35, you choose!
-  float sensorVoltage = Reading/1024.0 * 5.00;    // Calibrated to measured sensor voltage using resitive divider
-                                                  // It's Important this comment for your proyect.
-  float ppm = sensorVoltage * calibrate;          // Adjusted to ppm of Co2, clean air has 400ppm of Co2, sensor output = 0.16v in clean air (0.16x2500=400)
+  int   Reading = analogRead(39);                                   // Raw ADC reading ESP32 on VP or analogRead(39); on VN or analogRead(35); on GPIO 35, you choose!
+  float sensorVoltage = Reading/1024.0 * 5.00;                      // Calibrated to measured sensor voltage using resitive divider
+                                                                    // It's Important this comment for your proyect.
+  float ppm = sensorVoltage * calibrate;                            // Adjusted to ppm of Co2, clean air has 400ppm of Co2, sensor output = 0.16v in clean air (0.16x2500=400)
+
   
-  if      (ppm > 6000) CO2_level = "Extreme";      
-  else if (ppm > 3000) CO2_level = "High";
-  else if (ppm > 1500) CO2_level = "Moderate";
-  else if (ppm > 500)  CO2_level = "Low";
-  else                 CO2_level = "None";
-
+  if      (ppm > 6000)                CO2_level = "Extreme";      
+  else if (ppm > 1501 && 3000 > ppm)  CO2_level = "High";
+  else if (ppm > 401 && 1500 > ppm)   CO2_level = "Moderate";
+  else if (ppm < 400)                 CO2_level = "Low";
+  else                                CO2_level = "None";
+  
   Serial.println("CO2 Level");
-  Serial.println(String(Reading) + " " + String(sensorVoltage) + "v " + String(ppm) + " Co2 Level: "+CO2_level);
+  Serial.println(String(Reading) + " " + String(sensorVoltage) + "v " + String(ppm)+ "ppm " + " Co2 Level: "+ (CO2_level));
+  
   String GS = CO2_level.substring(0,1); 
-  message = IdNode+GS+"/"+ppm;
-  sendMessage(message);   
-  delay(1000);
+  message = IdNode+GS+"/"+String(ppm,2);                            //Convert Float values to one String
+ return message;
+
 }
 
 void printScreen() {
@@ -115,8 +121,8 @@ void printScreen() {
   display.drawString(0, 00, "LoRaWSN: " + String(localAddress));
   display.drawString(0, 10, " Node: " + IdNode
                           + " To: " + String(destination)
-                          + " Air is: " + AirQuality);
-  display.drawString(0, 20, " CO2 Level: " + CO2_level);
+                          + " Air is: " + (AirQuality));
+  display.drawString(0, 20, " CO2 Level: " + (CO2_level));
   display.display();
 } 
 
@@ -124,6 +130,9 @@ void printScreen() {
 void setup() {
   
   Serial.begin(115200);
+  dustSensor.setBaseline(5.0);                                    // set no dust voltage according to your own experiments
+  dustSensor.begin();
+  
   pinMode(OLED_RST,OUTPUT);
   digitalWrite(OLED_RST, LOW);                                    // set GPIO16 low to reset OLED
   delay(50);
@@ -134,37 +143,45 @@ void setup() {
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
   display.clear();
+  
   while (!Serial);
   Serial.println("TTGO LoRa32 V2.0 P2P");
   display.drawString(0, 00, "TTGO LoRa32 V2.0 P2P");
   display.display();
+  
   LoRa.setPins(SX1278_CS, SX1278_RST, SX1278_DI0);// set CS, reset, IRQ pin
   if (!LoRa.begin(LORA_BAND))
-  {             // initialize ratio at 868 MHz
+  {             // initialize ratio at 915 MHz
     Serial.println("LoRa init failed. Check your connections.");
     display.drawString(0, 10, "LoRa init failed");
     display.drawString(0, 20, "Check connections");
     display.display();
     while (true);                       // if failed, do nothing
   }
+  
   Serial.println("LoRa init succeeded.");
   display.drawString(0, 10, "LoRa init succeeded.");
   display.display();
   delay(1500);
   display.clear();
   display.display();
-  dustSensor.begin();
+  
 }
 
 void loop() {
   if (millis() - lastSendTime > interval) {
-    getReadingsDustDensity();
-      if (millis() > 20000){            // time for warm the MQ135 
-      getReadingGas();
-      }else{
-        Serial.println("Wait 2-mins while sensor to warm-up!");
-        display.drawString(0, 20, "MQ135 is warming up");
-      }
+    message = getReadingsDustDensity();
+    sendMessage(message);
+    
+    
+     if (millis() > 20000){            // time for warm the MQ135
+       message = getReadingGas();
+       sendMessage(message);
+       
+        }else{
+          Serial.println("Wait 2-mins while sensor to warm-up!");
+          display.drawString(0, 20, "MQ135 is warming up");
+        }
     lastSendTime = millis();            // timestamp the message
     interval = random(2000) + 1000;     // 2-3 seconds
     }
