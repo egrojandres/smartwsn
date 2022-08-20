@@ -27,18 +27,18 @@ const uint8_t SHARP_VO_PIN = 36;    // Sharp Dust/particle analog out pin used f
 GP2YDustSensor dustSensor(GP2YDustSensorType::GP2Y1010AU0F, SHARP_LED_PIN, SHARP_VO_PIN);
 SSD1306 display(OLED_ADDR, OLED_SDA, OLED_SCL);    // INICIALIZACION DE PANTALLA
 
-//////////////////////// CONFIG PLACA A //////////////
-byte localAddress = 0xFF;                            // address of this device
+//////////////////////// CONFIG PLACA A ////////////////
+byte localAddress = 0xFF;                             // address of this device
 byte destination = 0XAB;                              // destination to send to
-int interval = 3000;                               // interval between sends
-String message;                                    // send a message
-String outgoing;                                   // outgoing message
-byte msgCount = 0;                                 // count of outgoing messages
-long lastSendTime = 0;                             // last send time
-int contador = 0;                                  //
-String IdNode = "A";                               //
-float calibrate = 400;                            // Adjusted to ppm of Co2, clean air has 400ppm of Co2
-/////////////////////////////////////////////////////
+int interval = 3000;                                  // interval between sends
+String message;                                       // send a message
+String outgoing;                                      // outgoing message
+byte msgCount = 0;                                    // count of outgoing messages
+long lastSendTime = 0;                                // last send time
+int contador = 0;                                     //
+String IdNode = "A";                                  //
+float calibrate = 400;                                // Adjusted to ppm of Co2, clean air has 400ppm of Co2
+////////////////////////////////////////////////////////
 
 String CO2_level;
 String AirQuality;
@@ -69,7 +69,7 @@ String getReadingsDustDensity(){
   float Ppm = (dustSensor.getRunningAverage());
   
 
-  if (Dustdensity <= 75)                               AirQuality = "Excelent";   // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
+  if (Dustdensity <= 75)                               AirQuality = "Excelent";     // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
   else if (Dustdensity > 76 && Dustdensity < 150)      AirQuality = "Very Good";
   else if (Dustdensity > 151 && Dustdensity < 300)     AirQuality = "Good";
   else if (Dustdensity > 301 && Dustdensity < 1500)    AirQuality = "Acceptable";
