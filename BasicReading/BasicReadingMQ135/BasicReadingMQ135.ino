@@ -34,14 +34,16 @@ void loop() {
   int   Reading       = analogRead(39);          // Raw ADC reading ESP8266
   //int   Reading       = analogRead(36);        // Raw ADC reading ESP32 on VP or analogRead(39); on VN or analogRead(35); on GPIO 35, you choose!
   float sensorVoltage = Reading/1024.0 * 5.00;   // Calibrated to measured sensor voltage using resitive divider
-  float ppm           = sensorVoltage * 400.0;  // Adjusted to ppm of Co2, clean air has 400ppm of Co2, sensor output = 0.16v in clean air (0.16x2500=400)
-  Serial.print(String(Reading) + " " + String(sensorVoltage) + "v " + String(ppm) + "ppm Co2  ");
+  float ppm           = sensorVoltage * 500.0;  // Adjusted to ppm of Co2, clean air has 400ppm of Co2, sensor output = 0.16v in clean air (0.16x2500=400)
+  Serial.println(String(Reading) + " " + String(sensorVoltage) + "v " + String(ppm) + "ppm Co2  ");
+  /*
   if      (ppm > 6000) message = "Extreme";   // Arbitrary thresholds! or 'qualitative' or cannot be measured absolutely
   else if (ppm > 3000) message = "High";
   else if (ppm > 1500) message = "Moderate";
   else if (ppm > 500)  message = "Low";
   else                 message = "None";
   Serial.println(message);
+  */
   display.clear();
   display.setFont(ArialMT_Plain_16);  // Set the Font size LARGE
   display.drawString(20, 10, String(ppm,0));
