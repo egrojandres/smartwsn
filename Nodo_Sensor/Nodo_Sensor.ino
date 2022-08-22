@@ -64,7 +64,7 @@ String AirQuality;
 
 String getReadingsDustDensity(){
 
-  int   Reading = analogRead(36); 
+  int   Reading = analogRead(35); 
   float Dustdensity = (dustSensor.getDustDensity());
   float Ppm = (dustSensor.getRunningAverage());
   
@@ -81,7 +81,7 @@ String getReadingsDustDensity(){
   Serial.println(String(Reading) + " " + String(Ppm) + "ug/m3 " + "Quality Air: "+AirQuality);
   
   String AQ = AirQuality.substring(0,1); 
-  message = IdNode+AQ+"&"+String(Ppm,2)+"$"+String(Dustdensity,2);                //Convert Float values to one String
+  message = IdNode+AQ+String(Ppm,2)+"$"+String(Dustdensity,2);                //Convert Float values to one String
   return message;
     
 }
