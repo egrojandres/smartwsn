@@ -16,10 +16,10 @@ U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
 
 
 // Replace with your network credentials
-//unsigned long channelID = 1408212;
-String apiKey = "ZIAIA0FNJK6MGOM0"; // Enter your Write API key from ThingSpeak
-const char *ssid = "Redmi"; // replace with your wifi ssid and wpa2 key
-const char *password = "21061994";
+
+String apiKey = "****************";         // Enter your Write API key from ThingSpeak
+const char *ssid = "YOUR_SSID";             // replace with your wifi ssid and wpa2 key
+const char *password = "YOUR_PASWORD";
 const char* server = "api.thingspeak.com";
  
 WiFiClient client;
@@ -27,8 +27,8 @@ WiFiClient client;
 
 String message;
 
-String Dustdensity ="";
-String ppm ="";
+//String Dustdensity ="";
+//String ppm ="";
 String AdustDensity;
 String BdustDensity;
 String CdustDensity;
@@ -39,11 +39,11 @@ String Bco2;
 String Cco2;
 String Dco2;
 
-byte msgCount = 0;            // count of outgoing messages
-byte localAddress = 0xAB;     // address of this device
+byte msgCount = 0;              // count of outgoing messages
+byte localAddress = 0xAB;       // address of this device
 //byte destination = 0xFF;      // destination to send to
-long lastSendTime = 0;        // last send time
-int interval = 2000;          // interval between sends
+long lastSendTime = 0;          // last send time
+int interval = 2000;            // interval between sends
 
 void setup() {
   Serial.begin(115200);                   // initialize serial
@@ -121,16 +121,10 @@ void onReceive(int packetSize) {
   Serial.println("Snr: " + String(LoRa.packetSnr()));
   Serial.println();
 
-    int pos1 = incoming.indexOf('/');   
-    int pos2 = incoming.indexOf('$');
-
-
-    if (incoming.indexOf ("$")){
-      Serial.println ("Sensor Sharp");
-      String Dustdensity = incoming.substring(2,pos2);
-      String Ppm = incoming.substring(pos2+1,incoming.length());
-      
-      
+    if (incoming.charAt(2) == '$'){
+      Serial.print ("Sensor Sharp: ");
+      String Dustdensity = incoming.substring(3,incoming.length());
+      Serial.println (Dustdensity);
         if (incoming.charAt(0) == 'A') {
         AdustDensity = Dustdensity;
         }else if (incoming.charAt(0) == 'B') {
@@ -141,9 +135,11 @@ void onReceive(int packetSize) {
               DdustDensity = Dustdensity;
                 }else Serial.println("Sharp Load Fail");
         
-      }else if(incoming.indexOf ("/")){
-        Serial.println("Sensor MQ135");
-        co2= incoming.substring(pos1,incoming.length());
+      
+      }else if(incoming.charAt(2) == '&'){
+        Serial.print("Sensor MQ135: ");
+        String co2= incoming.substring(3,incoming.length());
+        Serial.println(co2);
         if (incoming.charAt(0) == 'A') {
           Aco2 = co2;
           }else if (incoming.charAt(0) == 'B') {
@@ -154,7 +150,7 @@ void onReceive(int packetSize) {
                 Dco2 = co2;
                 }else  (Serial.println("MQ135 Load fail"));
         
-      }else (Serial.println("Error de lectura"));
+      }//else (Serial.println("Error de lectura"));
 
       delay (1500);
 

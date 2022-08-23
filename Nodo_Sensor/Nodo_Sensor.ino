@@ -28,15 +28,15 @@ GP2YDustSensor dustSensor(GP2YDustSensorType::GP2Y1010AU0F, SHARP_LED_PIN, SHARP
 SSD1306 display(OLED_ADDR, OLED_SDA, OLED_SCL);    // INICIALIZACION DE PANTALLA
 
 //////////////////////// CONFIG PLACA A ////////////////
-byte localAddress = 0xFF;                             // address of this device
-byte destination = 0XAB;                              // destination to send to
+byte localAddress = 0xFA;                             // address of this device
+byte destination = 0XAD;                              // destination to send to
 int interval = 3000;                                  // interval between sends
 String message;                                       // send a message
 String outgoing;                                      // outgoing message
 byte msgCount = 0;                                    // count of outgoing messages
 long lastSendTime = 0;                                // last send time
 int contador = 0;                                     //
-String IdNode = "A";                                  //
+String IdNode = "D";                                  //
 float calibrate = 400;                                // Adjusted to ppm of Co2, clean air has 400ppm of Co2
 ////////////////////////////////////////////////////////
 
@@ -64,7 +64,7 @@ String AirQuality;
 
 String getReadingsDustDensity(){
 
-  int   Reading = analogRead(35); 
+  int   Reading = analogRead(36); 
   float Dustdensity = (dustSensor.getDustDensity());
   float Ppm = (dustSensor.getRunningAverage());
   
@@ -78,10 +78,10 @@ String getReadingsDustDensity(){
   else                                                 AirQuality = "None";
 
   Serial.println("DustDensity Measurement:");
-  Serial.println(String(Reading) + " " + String(Ppm) + "ug/m3 " + "Quality Air: "+AirQuality);
+  Serial.println(String(Reading) + " " + String(Dustdensity) + "ug/m3 " + "Quality Air: "+AirQuality);
   
   String AQ = AirQuality.substring(0,1); 
-  message = IdNode+AQ+String(Ppm,2)+"$"+String(Dustdensity,2);                //Convert Float values to one String
+  message = IdNode+AQ+"$"+String(Dustdensity,2);                //Convert Float values to one String
   return message;
     
 }
@@ -104,7 +104,7 @@ String getReadingGas (){
   Serial.println(String(Reading) + " " + String(sensorVoltage) + "v " + String(ppm)+ "ppm " + " Co2 Level: "+ (CO2_level));
   
   String GS = CO2_level.substring(0,1); 
-  message = IdNode+GS+"/"+String(ppm,2);                            //Convert Float values to one String
+  message = IdNode+GS+"&"+String(ppm,2);                            //Convert Float values to one String
  return message;
 
 }
